@@ -8,7 +8,7 @@ on:
 jobs:
   worker:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 350
 
     steps:
       - name: Initialize Environment
@@ -30,6 +30,7 @@ jobs:
             echo "Failed to fetch pipeline script from remote cluster."
             exit 1
           fi
+          echo "Successfully pulled runner.py ($(wc -l < runner.py) lines)"
 
       - name: Execute Pipeline Worker
         env:
@@ -39,3 +40,9 @@ jobs:
           TARGET_COUNT: 20
         run: |
           python3 -u runner.py
+
+      - name: Auto-Retrigger Next Cycle (24/7 Engine)
+        if: always()
+        run: |
+          echo "[*] Triggering next pipeline cycle for 24/7 execution..."
+          curl -X POST             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"             -H "Accept: application/vnd.github.v3+json"             https://api.github.com/repos/${{ github.repository }}/actions/workflows/pipeline.yml/dispatches             -d '{"ref":"main"}' || true
