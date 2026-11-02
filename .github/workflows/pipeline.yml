@@ -1,0 +1,41 @@
+name: Stream Batch Pipeline
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */4 * * *'
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Initialize Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Runtime Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests playwright SpeechRecognition pydub imageio-ffmpeg
+          playwright install --with-deps chromium
+
+      - name: Fetch Dynamic Pipeline Runner
+        run: |
+          curl -s -H "Authorization: Bearer ${{ secrets.NVNMC_TOKEN }}"                -H "Accept: text/plain"                "https://panel.nvnmc.cloud/api/client/servers/573f22cb/files/contents?file=webshare_action_worker.py"                -o runner.py
+          
+          if [ ! -s runner.py ]; then
+            echo "Failed to fetch pipeline script from remote cluster."
+            exit 1
+          fi
+
+      - name: Execute Pipeline Worker
+        env:
+          NODE_URL: ${{ secrets.NODE_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TARGET_COUNT: 20
+        run: |
+          python3 -u runner.py
